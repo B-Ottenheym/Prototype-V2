@@ -212,7 +212,8 @@ def step_3_scenario():
 
     st.markdown("#### Projectkenmerken")
     df = _features_to_table(scenario.features)
-    st.dataframe(df, use_container_width=True, df.reset_index(drop=True))
+    st.dataframe(df, use_container_width=True)
+    st.dataframe(f.reset_index(drop=True))
 
     st.markdown("---")
     st.markdown(
