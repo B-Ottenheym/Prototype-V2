@@ -214,14 +214,12 @@ def step_3_scenario():
     df = _features_to_table(scenario.features)
 
     
+    
     df = df.copy()
     df = df.reset_index(drop=True)
+    df = df.astype(str)
     
-    for col in df.columns:
-        df[col] = df[col].astype(str)
-    
-    st.dataframe(df)
-
+    st.table(df)
 
     st.markdown("---")
     st.markdown(
