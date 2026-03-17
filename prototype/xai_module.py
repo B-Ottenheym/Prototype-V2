@@ -6,6 +6,7 @@ import dice_ml
 from dictionaries import variable_descriptions, variable_labels, variable_labels2
 from alibi.explainers import AnchorTabular
 from sklearn.tree import DecisionTreeClassifier, plot_tree
+from anchor import anchor_tabular
 
 def plot_global_shap(best_regressor, X_test_classification, X_test_regression, test_delayed, categorical_vars):
     predicted_severity = np.zeros(len(X_test_classification))
@@ -251,7 +252,7 @@ def generate_local_shap(shap_explainer, input_data, X_test_classification, categ
                 description = variable_descriptions.get(key)
                 st.markdown(f"**{label}** : {description}")
 
-def generate_anchor_explanation(model, X_train, input_instance, feature_names, categorical_features=None):
+def generate_anchor_explanation1(model, X_train, input_instance, feature_names, categorical_features=None):
 
     def prettify_anchor_predicate(rule: str) -> str:
         """
@@ -367,6 +368,142 @@ def generate_anchor_explanation(model, X_train, input_instance, feature_names, c
                 5. De regel stopt zodra de voorspelling in **minstens 95% van de gevallen gelijk blijft**.
 
                 De gebruikte drempelwaarden zijn dus punten waarop het model intern gevoelig wordt voor verandering""")
+
+    else:
+        st.warning(
+            "Voor dit project kon geen stabiele beslisregel worden gevonden die met voldoende betrouwbaarheid geldt."
+        )
+
+
+
+def generate_anchor_explanation(
+    model,
+    X_train,
+    input_instance,
+    feature_names,
+    categorical_features=None,   # (better name: categorical_names)
+    class_names=None,
+    threshold=0.95
+):
+    def prettify_anchor_predicate(rule: str) -> str:
+        import re
+
+        m = re.match(r"^(.+?)\s*([<>]=?)\s*([0-9]*\.?[0-9]+)$", rule.strip())
+        if not m:
+            return rule
+
+        feature, op, val_str = m.group(1), m.group(2), m.group(3)
+
+        try:
+            val = float(val_str)
+        except ValueError:
+            return rule
+
+        def label_of(base: str) -> str:
+            return variable_labels2.get(base, base)
+
+        # One-hot / dummy case
+        if "_" in feature:
+            base, category = feature.rsplit("_", 1)
+            if val in (0.0, 0.5, 1.0):
+                base_label = label_of(base)
+                if op in ("<", "<=") and val <= 0.5:
+                    return f"{base_label} ≠ {category}"
+                if op in (">", ">=") and val >= 0.5:
+                    return f"{base_label} = {category}"
+
+        feat_label = label_of(feature)
+        val_fmt = f"{val:.2f}" if abs(val) < 1000 else f"{val:.0f}"
+        return f"{feat_label} {op} {val_fmt}"
+
+    # --- predictor must return integer class labels (n,) ---
+    def predict_fn(X: np.ndarray) -> np.ndarray:
+        # model.predict should return labels for sklearn classifiers
+        y = model.predict(X)
+        # ensure integer array if possible
+        try:
+            return y.astype(int)
+        except Exception:
+            return y
+
+    # Prepare training data as numpy
+    X_train_np = X_train.values if hasattr(X_train, "values") else np.asarray(X_train)
+
+    # Prepare instance as 1D numpy
+    x_np = input_instance.values if hasattr(input_instance, "values") else np.asarray(input_instance)
+    x_np = np.asarray(x_np)
+    if x_np.ndim == 2:
+        x_np = x_np[0]  # shape (n_features,)
+
+    # Class names (optional but recommended for readability)
+    if class_names is None:
+        # If sklearn classifier with .classes_, use that; else fallback
+        if hasattr(model, "classes_"):
+            class_names = [str(c) for c in model.classes_]
+        else:
+            class_names = ["class_0", "class_1"]
+
+    explainer = anchor_tabular.AnchorTabularExplainer(
+        class_names,
+        feature_names,
+        X_train_np,
+        categorical_names=(categorical_features or {})
+    )
+
+    # Explain single instance
+    exp = explainer.explain_instance(x_np, predict_fn, threshold=threshold)
+
+    # Extract rule strings + stats (anchor-exp exposes helper methods)
+    # (Depending on version, these are methods; we call them.)
+    rules = exp.names() if hasattr(exp, "names") else []
+    precision = exp.precision() if hasattr(exp, "precision") else None
+    coverage = exp.coverage() if hasattr(exp, "coverage") else None
+
+    if rules:
+        st.write("**Beslisregel**")
+        for r in rules:
+            st.markdown(f"- {prettify_anchor_predicate(r)}")
+
+        st.markdown("---")
+
+        if precision is not None:
+            st.markdown(
+                f"**Betrouwbaarheid van deze regel:** {precision:.2f}  \n"
+                "*In welk deel van de gevallen deze regel tot dezelfde voorspelling leidt.*"
+            )
+        if coverage is not None:
+            st.markdown(
+                f"**Toepasbaar op:** {coverage * 100:.1f}% van vergelijkbare projecten  \n"
+                "*Hoe vaak deze combinatie van voorwaarden voorkomt bij soortgelijke projecten.*"
+            )
+
+        with st.expander("Wat betekent deze uitleg?"):
+            st.markdown("""
+                Deze uitleg toont een **regel** die laat zien onder welke omstandigheden het AI‑model
+                zijn **inschatting van het risico op vertraging stabiel houdt**.
+
+                **Hoe leest u deze regel?**
+                - De voorwaarden hieronder vormen samen een **voldoende combinatie**.
+                - **Zolang álle voorwaarden tegelijk gelden**, verandert de inschatting van het
+                vertragingrisico **niet wezenlijk**.
+                - Andere projectkenmerken mogen dan variëren, zonder dat dit leidt tot een andere
+                beoordeling van het risico.
+
+                👉 Zie het als:
+                > *“Onder deze omstandigheden verandert de risicobeoordeling van het model doorgaans niet.”*
+            """)
+
+        with st.expander("Hoe kiest het model deze voorwaarden?"):
+            st.markdown(f"""
+                De AI heeft deze voorwaarden **niet vooraf gekregen**.
+
+                Zo wordt de regel gevonden:
+                1. Het model start bij dit specifieke project.
+                2. Andere projectkenmerken worden vervolgens **willekeurig gevarieerd**.
+                3. Het model controleert wanneer de inschatting van het vertragingsrisico **niet verandert**.
+                4. Alleen voorwaarden die de voorspelling **stabiel houden** worden toegevoegd.
+                5. De regel stopt zodra de voorspelling in **minstens {int(threshold*100)}% van de gevallen gelijk blijft**.
+            """)
 
     else:
         st.warning(
