@@ -213,13 +213,16 @@ def step_3_scenario():
     st.markdown("#### Projectkenmerken")
     df = _features_to_table(scenario.features)
 
+    
     df = df.copy()
+    df = df.reset_index(drop=True)
+    
+    # Maak ALLE kolommen expliciet Arrow-veilig
     for col in df.columns:
-        if df[col].dtype == "object":
-            df[col] = df[col].astype(str)
+        df[col] = df[col].astype(str)
+    
+    st.table(df)
 
-    st.dataframe(df, use_container_width=True)
-    st.dataframe(df.reset_index(drop=True))
 
     st.markdown("---")
     st.markdown(
