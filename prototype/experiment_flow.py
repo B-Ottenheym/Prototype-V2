@@ -217,11 +217,10 @@ def step_3_scenario():
     df = df.copy()
     df = df.reset_index(drop=True)
     
-    # Maak ALLE kolommen expliciet Arrow-veilig
     for col in df.columns:
         df[col] = df[col].astype(str)
     
-    st.table(df)
+    st.dataframe(df)
 
 
     st.markdown("---")
