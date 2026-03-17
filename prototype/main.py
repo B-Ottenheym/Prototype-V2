@@ -8,7 +8,7 @@ from dictionaries import variable_descriptions, variable_groups, variable_labels
 from experiment_config import EXPERIMENT_MODE
 from experiment_flow import run_experiment
 
-st.set_page_config(page_title=None, page_icon=None, layout="centered", initial_sidebar_state=None, menu_items=None)
+st.set_page_config(page_title=None, page_icon=None, layout="centered", menu_items=None)
 
 if EXPERIMENT_MODE:
     run_experiment()
