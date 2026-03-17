@@ -1,0 +1,12 @@
+numpy
+pandas
+scikit-learn
+xgboost
+lightgbm
+catboost
+streamlit
+matplotlib
+openpyxl
+shap
+dice-ml
+alibi
