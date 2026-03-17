@@ -340,7 +340,7 @@ De invoerwaarden zijn vastgezet voor dit onderzoek en kunnen niet worden aangepa
                     *Een globale indruk van hoe het model redeneert.*
                     """)
 
-    st.divider()
+    st.markdown("---")
     col1, col2 = st.columns([1, 1])
     with col1:
         st.button("Terug", key="step3_back", on_click=_back)
