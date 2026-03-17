@@ -4,7 +4,7 @@ scikit-learn
 xgboost
 lightgbm
 catboost
-streamlit
+streamlit==1.55.0
 matplotlib
 openpyxl
 shap
