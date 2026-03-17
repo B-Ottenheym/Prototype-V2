@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import streamlit as st
 import dice_ml
 from dictionaries import variable_descriptions, variable_labels, variable_labels2
-from alibi.explainers import AnchorTabular
 from sklearn.tree import DecisionTreeClassifier, plot_tree
 from anchor import anchor_tabular
 
