@@ -9,5 +9,4 @@ matplotlib
 openpyxl
 shap
 dice-ml
-alibi
 altair<5
